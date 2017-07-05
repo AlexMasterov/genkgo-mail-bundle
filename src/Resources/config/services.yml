@@ -1,0 +1,30 @@
+services:
+  genkgo_mail.protocol.smtp.client_factory.abstract:
+    abstract: true
+    public: false
+    factory: 'Genkgo\Mail\Protocol\Smtp\ClientFactory::fromString'
+    arguments:
+      - "smtp://localhost:25/?timeout=30"
+
+  genkgo_mail.transport.smtp.abstract:
+    abstract: true
+    class: 'Genkgo\Mail\Transport\SmtpTransport'
+    arguments:
+      - '@genkgo_mail.protocol.client'
+      - '@genkgo_mail.transport.envelope_factory'
+
+  genkgo_mail.transport.sendmail.abstract:
+    abstract: true
+    class: 'Genkgo\Mail\Transport\PhpMailTransport'
+    arguments:
+      - '@genkgo_mail.transport.envelope_factory'
+
+  genkgo_mail.transport.null.abstract:
+    abstract: true
+    class: 'Genkgo\Mail\Transport\NullTransport'
+
+  genkgo_mail.transport.envelope_factory:
+    public: false
+    factory: 'Genkgo\Mail\Transport\EnvelopeFactory::useExtractedHeader'
+
+  Genkgo\Mail\TransportInterface: '@genkgo_mail.transport'
