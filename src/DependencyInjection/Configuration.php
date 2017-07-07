@@ -17,8 +17,9 @@ class Configuration implements ConfigurationInterface
     public function getConfigTreeBuilder()
     {
         $treeBuilder = new TreeBuilder();
+        $rootNode = $treeBuilder->root('genkgo_mail');
 
-        $treeBuilder->root('genkgo_mail')
+        $rootNode
             ->beforeNormalization()
                 ->ifTrue(static function ($v) {
                     return \is_array($v) && !\array_key_exists('mailers', $v);
@@ -36,8 +37,7 @@ class Configuration implements ConfigurationInterface
             ->end()
             ->beforeNormalization()
                 ->ifTrue(static function ($v) {
-                    ['default_mailer' => $defaultMailer] = $v;
-                    return !isset($v['mailers'][$defaultMailer]);
+                    return empty($v['mailers'][$v['default_mailer']]);
                 })
                 ->then(static function ($v) {
                     $v['default_mailer'] = \key($v['mailers']);
@@ -71,6 +71,7 @@ class Configuration implements ConfigurationInterface
                 ->end()
                 ->children()
                     ->enumNode('transport')->defaultValue('smtp')
+                        ->treatNullLike('null')
                         ->values(['smtp', 'sendmail', 'null'])
                     ->end()
                     ->scalarNode('host')->defaultValue('localhost')->end()
@@ -83,43 +84,55 @@ class Configuration implements ConfigurationInterface
                     ->enumNode('encryption')->defaultNull()
                         ->values(['tls', 'ssl', null])
                     ->end()
-                    ->arrayNode('crypto')
-                        ->prototype('scalar')->end()
-                        ->validate()
-                            ->always()
-                            ->then(static function ($v) {
-                                if (empty($v)) {
-                                    return null;
-                                }
-
-                                static $missingMethods = [];
-                                foreach ($v as $method) {
-                                    $method = \trim((string) $method);
-                                    $constant = "STREAM_CRYPTO_METHOD_{$method}";
-                                    if (\defined($constant)) {
-                                        $v |= \constant($constant);
-                                    } else {
-                                        $missingMethods[] = $constant;
-                                    }
-                                }
-
-                                if (empty($missingMethods)) {
-                                    return $v;
-                                }
-
-                                throw new InvalidConfigurationException(sprintf(
-                                    'The crypto methods are not supported: "%s".',
-                                    \implode('", "', $missingMethods)
-                                ));
-                            })
-                        ->end()
-                    ->end()
+                    ->append($this->getCryptoNode())
                     ->scalarNode('local_domain')->defaultNull()->end()
                     ->scalarNode('timeout')->defaultValue(30)->end()
                     ->scalarNode('reconnect_after')->defaultNull()->end()
                     ->scalarNode('retry')->defaultNull()->end()
                     ->booleanNode('lazy')->defaultFalse()->end()
-                ->end()
+            ->end()
+        ;
+
+        return $node;
+    }
+
+    /**
+     * @return ArrayNodeDefinition
+     */
+    private function getCryptoNode()
+    {
+        $node = (new TreeBuilder)->root('crypto');
+        $node
+            ->prototype('scalar')->end()
+            ->validate()
+                ->always()
+                ->then(static function ($v) {
+                    static $missingMethods = [];
+                    foreach ($v as $method) {
+                        $method = \trim((string) $method);
+                        $constant = "STREAM_CRYPTO_METHOD_{$method}";
+                        if (\defined($constant)) {
+                            $v |= \constant($constant);
+                        } else {
+                            $missingMethods[] = $constant;
+                        }
+                    }
+
+                    if (empty($missingMethods)) {
+                        return $v;
+                    }
+
+                    throw new InvalidConfigurationException(sprintf(
+                        'The crypto methods are not supported: "%s".',
+                        \implode('", "', $missingMethods)
+                    ));
+                })
+            ->end()
+            ->validate()
+                ->ifEmpty()
+                ->then(static function ($v) {
+                    return null;
+                })
             ->end()
         ;
 
