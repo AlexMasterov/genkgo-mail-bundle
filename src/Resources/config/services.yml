@@ -23,6 +23,10 @@ services:
     abstract: true
     class: 'Genkgo\Mail\Transport\NullTransport'
 
+  genkgo_mail.transport.lazy.abstract:
+    abstract: true
+    class: 'AlexMasterov\GenkgoMailBundle\Transport\LazyTransport'
+
   genkgo_mail.transport.envelope_factory:
     public: false
     factory: 'Genkgo\Mail\Transport\EnvelopeFactory::useExtractedHeader'

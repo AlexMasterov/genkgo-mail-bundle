@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace AlexMasterov\GenkgoMailBundle\DependencyInjection\Compiler;
 
-use Genkgo\Mail\Protocol\Smtp\ClientFactory;
 use Symfony\Component\DependencyInjection\{
     ChildDefinition,
     Compiler\CompilerPassInterface,
@@ -43,7 +42,7 @@ class SmtpClientPass implements CompilerPassInterface
         $clientId = "{$mailer}.protocol.client";
         $container->setDefinition($clientId, $this->clientDefinition($factoryId));
 
-        $container->getDefinition($mailer)->setArgument('index_0', new Reference($clientId));
+        $container->getDefinition($mailer)->replaceArgument(0, new Reference($clientId));
     }
 
     /**
@@ -64,11 +63,11 @@ class SmtpClientPass implements CompilerPassInterface
     private function factoryDefinition(array $options): ChildDefinition
     {
         $definition = new ChildDefinition('genkgo_mail.protocol.smtp.client_factory.abstract');
-        $definition->setArgument('index_0', $this->dsn($options));
+        $definition->replaceArgument(0, $this->dsn($options));
 
         if (isset($options['auth_mode'], $options['username'], $options['password'])) {
             $definition->addMethodCall('withAuthentication', [
-                $options['auth_mode'],
+                \array_flip(['none', 'plain', 'login', 'auto'])[$options['auth_mode']],
                 $options['username'],
                 $options['password'],
             ]);
@@ -95,7 +94,7 @@ class SmtpClientPass implements CompilerPassInterface
             'ehlo'           => $options['local_domain'],
             'timeout'        => $options['timeout'],
             'reconnectAfter' => $options['reconnect_after'],
-            'crypto'         => $options['crypto'] ?? null,
+            'crypto'         => $options['crypto'],
         ]);
 
         return "{$schema}://{$host}:{$port}/?{$query}";

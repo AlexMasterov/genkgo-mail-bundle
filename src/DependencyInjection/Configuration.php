@@ -62,44 +62,40 @@ class Configuration implements ConfigurationInterface
         $node
             ->useAttributeAsKey('name')
             ->prototype('array')
+                ->beforeNormalization()
+                    ->always()
+                    ->then(static function ($v) {
+                        $v['crypto'] = $v['crypto'] ?? [];
+                        return $v;
+                    })
+                ->end()
                 ->children()
-                    ->scalarNode('transport')->defaultValue('smtp')
-                        ->validate()
-                            ->ifNotInArray(['smtp', 'sendmail', 'null'])
-                            ->thenInvalid('The %s transport is not supported.')
-                        ->end()
+                    ->enumNode('transport')->defaultValue('smtp')
+                        ->values(['smtp', 'sendmail', 'null'])
                     ->end()
                     ->scalarNode('host')->defaultValue('localhost')->end()
                     ->scalarNode('port')->defaultNull()->end()
                     ->scalarNode('username')->defaultNull()->end()
                     ->scalarNode('password')->defaultNull()->end()
-                    ->scalarNode('auth_mode')->defaultValue('auto')
-                    ->validate()
-                        ->ifString()
-                        ->then(static function ($v) {
-                            static $mode = ['none' => 0, 'plain'  => 1, 'login' => 2, 'auto'  => 3];
-                            return $mode[$v] ?? $mode['auto'];
-                        })
-                        ->end()
+                    ->enumNode('auth_mode')->defaultValue('auto')
+                        ->values(['none', 'plain', 'login', 'auto'])
                     ->end()
-                    ->scalarNode('encryption')->defaultNull()
-                        ->validate()
-                            ->ifNotInArray(['tls', 'ssl', null])
-                            ->thenInvalid('The %s encryption is not supported.')
-                        ->end()
+                    ->enumNode('encryption')->defaultNull()
+                        ->values(['tls', 'ssl', null])
                     ->end()
                     ->arrayNode('crypto')
-                        ->beforeNormalization()->castToArray()->end()
-                        ->ignoreExtraKeys(false)
-                        ->normalizeKeys(false)
+                        ->prototype('scalar')->end()
                         ->validate()
-                            ->ifTrue(static function ($v) {
-                                return \is_array($v) && \count($v) > 0;
-                            })
+                            ->always()
                             ->then(static function ($v) {
+                                if (empty($v)) {
+                                    return null;
+                                }
+
                                 static $missingMethods = [];
                                 foreach ($v as $method) {
-                                    $constant = 'STREAM_CRYPTO_METHOD_' . \trim($method);
+                                    $method = \trim((string) $method);
+                                    $constant = "STREAM_CRYPTO_METHOD_{$method}";
                                     if (\defined($constant)) {
                                         $v |= \constant($constant);
                                     } else {
@@ -107,14 +103,14 @@ class Configuration implements ConfigurationInterface
                                     }
                                 }
 
-                                if ($missingMethods) {
-                                    throw new InvalidConfigurationException(sprintf(
-                                        'The crypto methods are not supported: "%s".',
-                                        \implode('", "', $missingMethods)
-                                    ));
+                                if (empty($missingMethods)) {
+                                    return $v;
                                 }
 
-                                return $v;
+                                throw new InvalidConfigurationException(sprintf(
+                                    'The crypto methods are not supported: "%s".',
+                                    \implode('", "', $missingMethods)
+                                ));
                             })
                         ->end()
                     ->end()
@@ -122,6 +118,7 @@ class Configuration implements ConfigurationInterface
                     ->scalarNode('timeout')->defaultValue(30)->end()
                     ->scalarNode('reconnect_after')->defaultNull()->end()
                     ->scalarNode('retry')->defaultNull()->end()
+                    ->booleanNode('lazy')->defaultFalse()->end()
                 ->end()
             ->end()
         ;

@@ -47,12 +47,15 @@ class GenkgoMailExtension extends ConfigurableExtension
     private function registerMailers(array $mailers, ContainerBuilder $container): void
     {
         foreach ($mailers as $mailer => $options) {
-            ['transport' => $transport] = $options;
+            ['transport' => $transport, 'lazy' => $lazy] = $options;
 
             $definition = new ChildDefinition("genkgo_mail.transport.{$transport}.abstract");
 
             if ('smtp' === $transport) {
                 $definition->addTag('genkgo_mail.smtp_client', $options);
+            }
+            if ($lazy) {
+                $definition->addTag('genkgo_mail.transport.lazy');
             }
 
             $container->setDefinition("genkgo_mail.mailer.{$mailer}", $definition);
