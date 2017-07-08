@@ -7,7 +7,7 @@ use AlexMasterov\GenkgoMailBundle\Tests\DependencyInjection\ExtensionTrait;
 use Genkgo\Mail\TransportInterface;
 use PHPUnit\Framework\TestCase;
 
-class GenkgoMailExtensionTest extends TestCase
+class ExtensionTest extends TestCase
 {
     use ExtensionTrait;
 

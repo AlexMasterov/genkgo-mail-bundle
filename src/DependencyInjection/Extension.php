@@ -11,7 +11,7 @@ use Symfony\Component\DependencyInjection\{
 };
 use Symfony\Component\HttpKernel\DependencyInjection\ConfigurableExtension;
 
-class GenkgoMailExtension extends ConfigurableExtension
+class Extension extends ConfigurableExtension
 {
     /**
      * @inheritDoc

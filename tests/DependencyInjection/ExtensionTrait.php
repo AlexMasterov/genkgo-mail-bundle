@@ -5,7 +5,7 @@ namespace AlexMasterov\GenkgoMailBundle\Tests\DependencyInjection;
 
 use AlexMasterov\GenkgoMailBundle\DependencyInjection\{
     Configuration,
-    GenkgoMailExtension
+    Extension
 };
 use AlexMasterov\GenkgoMailBundle\GenkgoMailBundle;
 use Symfony\Component\Config\Definition\Processor;
@@ -17,29 +17,17 @@ trait ExtensionTrait
     {
         $container = new ContainerBuilder();
 
-        $this->buildBuindle($container);
-        $this->loadExtension($config, $container);
-
-        return $container;
-    }
-
-    private function buildBuindle(ContainerBuilder $container): ContainerBuilder
-    {
+        // Apply compiler passes
         $bundle = new GenkgoMailBundle();
         $bundle->build($container);
 
-        return $container;
-    }
-
-    private function loadExtension(array $config, ContainerBuilder $container): ContainerBuilder
-    {
         $config = $this->processConfiguration($config);
 
         $getLoadInternal = function () use ($config, $container) {
             return $this->loadInternal($config, $container);
         };
 
-        $getLoadInternal->call(new GenkgoMailExtension);
+        $getLoadInternal->call($bundle->getContainerExtension());
 
         return $container;
     }
