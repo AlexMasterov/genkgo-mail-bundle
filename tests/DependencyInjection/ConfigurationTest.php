@@ -52,32 +52,10 @@ final class ConfigurationTest extends TestCase
     /**
      * @test
      */
-    public function is_valid_processed_non_existent_default_mailer()
-    {
-        $config = [
-            'default_mailer' => 'invalid',
-            'mailers' => [
-                'valid' => $this->nodeTransport(),
-            ],
-        ];
-
-        $normalized = [
-            'default_mailer' => 'valid',
-            'mailers' => [
-                'valid' => $this->normalizeNodeTransport(),
-            ],
-        ];
-
-        self::assertProcessedConfigurationEquals($normalized, $config);
-    }
-
-    /**
-     * @test
-     */
     public function is_valid_processed_crypto_method()
     {
         $config = $this->nodeTransport([
-            'crypto' => ['SSLv2_CLIENT'],
+            'crypto' => 'SSLv2_CLIENT',
         ]);
 
         $normalized = $this->normalizeRoot([
@@ -99,7 +77,7 @@ final class ConfigurationTest extends TestCase
         $this->expectException(InvalidConfigurationException::class);
 
         $config = [
-            'crypto' => ['INVALID_CRYPTO'],
+            'crypto' => 'INVALID_CRYPTO',
         ];
 
         $normalized = $this->normalizeRoot();

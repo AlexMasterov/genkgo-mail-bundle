@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace AlexMasterov\GenkgoMailBundle\DependencyInjection;
 
 use Symfony\Component\Config\Definition\{
+    Builder\ArrayNodeDefinition,
     Builder\TreeBuilder,
     ConfigurationInterface,
     Exception\InvalidConfigurationException
@@ -19,56 +20,47 @@ class Configuration implements ConfigurationInterface
         $treeBuilder = new TreeBuilder();
         $rootNode = $treeBuilder->root('genkgo_mail');
 
+        $this->normalizeRootNode($rootNode);
         $rootNode
-            ->beforeNormalization()
-                ->ifTrue(static function ($v) {
-                    return \is_array($v) && !\array_key_exists('mailers', $v);
+            ->validate()
+                ->ifTrue(static function ($value) {
+                    return !isset($value['mailers'][$value['default_mailer']]);
                 })
-                ->then(static function ($v) {
-                    $defaultMailer = $v['default_mailer'] ?? 'default';
-                    unset($v['default_mailer']);
-
-                    $mailers = $v['mailer'] ?? [$defaultMailer => $v];
-                    return [
-                        'default_mailer' => $defaultMailer,
-                        'mailers' => $mailers,
-                    ];
-                })
-            ->end()
-            ->beforeNormalization()
-                ->ifTrue(static function ($v) {
-                    return empty($v['mailers'][$v['default_mailer']]);
-                })
-                ->then(static function ($v) {
-                    $v['default_mailer'] = \key($v['mailers']);
-                    return $v;
-                })
+                ->thenInvalid('"default_mailer" not found.')
             ->end()
             ->children()
                 ->scalarNode('default_mailer')->end()
-                ->append($this->getMailersNode())
+                ->append($this->mailersNode())
             ->end()
         ;
 
         return $treeBuilder;
     }
 
+    private function normalizeRootNode(ArrayNodeDefinition $rootNode)
+    {
+        $normalizer = static function ($value) {
+            $defaultMailer = $value['default_mailer'] ?? 'default';
+            unset($value['default_mailer']);
+
+            return [
+                'default_mailer' => $defaultMailer,
+                'mailers' => $value['mailers'] ?? [$defaultMailer => $value],
+            ];
+        };
+
+        $rootNode->beforeNormalization()->always()->then($normalizer)->end();
+    }
+
     /**
      * @return ArrayNodeDefinition
      */
-    private function getMailersNode()
+    private function mailersNode()
     {
         $node = (new TreeBuilder)->root('mailers');
         $node
             ->useAttributeAsKey('name')
             ->prototype('array')
-                ->beforeNormalization()
-                    ->always()
-                    ->then(static function ($v) {
-                        $v['crypto'] = $v['crypto'] ?? [];
-                        return $v;
-                    })
-                ->end()
                 ->children()
                     ->enumNode('transport')->defaultValue('smtp')
                         ->treatNullLike('null')
@@ -84,55 +76,40 @@ class Configuration implements ConfigurationInterface
                     ->enumNode('encryption')->defaultNull()
                         ->values(['tls', 'ssl', null])
                     ->end()
-                    ->append($this->getCryptoNode())
+                    ->scalarNode('crypto')->defaultNull()
+                        ->beforeNormalization()
+                            ->ifString()
+                            ->then(static function ($v) {
+                                $methods = \preg_split('/\s*,\s*/', $v, -1, \PREG_SPLIT_NO_EMPTY);
+
+                                static $crypto = null;
+                                static $missingMethods = [];
+                                foreach ($methods as $method) {
+                                    $constant = "STREAM_CRYPTO_METHOD_{$method}";
+                                    if (\defined($constant)) {
+                                        $crypto |= \constant($constant);
+                                    } else {
+                                        $missingMethods[] = $constant;
+                                    }
+                                }
+
+                                if (empty($missingMethods)) {
+                                    return $crypto;
+                                }
+
+                                throw new InvalidConfigurationException(\sprintf(
+                                    'The crypto methods are not supported: "%s".',
+                                    \implode('", "', $missingMethods)
+                                ));
+                            })
+                        ->end()
+                    ->end()
                     ->scalarNode('local_domain')->defaultNull()->end()
                     ->scalarNode('timeout')->defaultValue(30)->end()
                     ->scalarNode('reconnect_after')->defaultNull()->end()
                     ->scalarNode('retry')->defaultNull()->end()
                     ->booleanNode('lazy')->defaultFalse()->end()
-            ->end()
-        ;
-
-        return $node;
-    }
-
-    /**
-     * @return ArrayNodeDefinition
-     */
-    private function getCryptoNode()
-    {
-        $node = (new TreeBuilder)->root('crypto');
-        $node
-            ->prototype('scalar')->end()
-            ->validate()
-                ->always()
-                ->then(static function ($v) {
-                    static $missingMethods = [];
-                    foreach ($v as $method) {
-                        $method = \trim((string) $method);
-                        $constant = "STREAM_CRYPTO_METHOD_{$method}";
-                        if (\defined($constant)) {
-                            $v |= \constant($constant);
-                        } else {
-                            $missingMethods[] = $constant;
-                        }
-                    }
-
-                    if (empty($missingMethods)) {
-                        return $v;
-                    }
-
-                    throw new InvalidConfigurationException(sprintf(
-                        'The crypto methods are not supported: "%s".',
-                        \implode('", "', $missingMethods)
-                    ));
-                })
-            ->end()
-            ->validate()
-                ->ifEmpty()
-                ->then(static function ($v) {
-                    return null;
-                })
+                ->end()
             ->end()
         ;
 
