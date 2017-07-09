@@ -21,7 +21,7 @@ final class ConfigurationTest extends TestCase
     public function it_valid_processed_transport()
     {
         $config = [
-            'transport' => 'smtp',
+            'smtp' => [],
         ];
 
         $normalized = $this->normalizeRoot();
@@ -32,17 +32,19 @@ final class ConfigurationTest extends TestCase
     /**
      * @test
      */
-    public function is_valid_processed_default_mailer()
+    public function is_valid_processed_default_transport()
     {
         $config = [
-            'default_mailer' => 'mock_default',
-            'transport' => 'smtp',
+            'default_transport' => 'mock_default',
+            'smtp' => [],
         ];
 
         $normalized = [
-            'default_mailer' => $config['default_mailer'],
-            'mailers' => [
-                $config['default_mailer'] => $this->normalizeNodeTransport(),
+            'default_transport' => $config['default_transport'],
+            'transports' => [
+                $config['default_transport'] => [
+                    'smtp' => $this->normalizeSmtpNode(),
+                ],
             ],
         ];
 
@@ -54,14 +56,18 @@ final class ConfigurationTest extends TestCase
      */
     public function is_valid_processed_crypto_method()
     {
-        $config = $this->nodeTransport([
-            'crypto' => 'SSLv2_CLIENT',
-        ]);
+        $config = [
+            'smtp' => [
+                'crypto' => 'SSLv2_CLIENT',
+            ],
+        ];
 
         $normalized = $this->normalizeRoot([
-            'mailers' => [
+            'transports' => [
                 'default' => [
-                    'crypto' => 3,
+                    'smtp' => $this->normalizeSmtpNode([
+                        'crypto' => 3,
+                    ]),
                 ],
             ],
         ]);
@@ -77,7 +83,9 @@ final class ConfigurationTest extends TestCase
         $this->expectException(InvalidConfigurationException::class);
 
         $config = [
-            'crypto' => 'INVALID_CRYPTO',
+            'smtp' => [
+                'crypto' => 'INVALID_CRYPTO',
+            ],
         ];
 
         $normalized = $this->normalizeRoot();

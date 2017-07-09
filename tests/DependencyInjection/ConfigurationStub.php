@@ -5,44 +5,36 @@ namespace AlexMasterov\GenkgoMailBundle\Tests\DependencyInjection;
 
 trait ConfigurationStub
 {
-    protected function nodeTransport(array $config = []): array
-    {
-        $default = $this->normalizeNodeTransport();
-
-        return array_replace($default, $config);
-    }
-
-    protected function normalizeNodeTransport(array $config = []): array
-    {
-        static $default = [
-            'transport'       => 'smtp',
-            'host'            => 'localhost',
-            'port'            => null,
-            'username'        => null,
-            'password'        => null,
-            'auth_mode'       => 'auto',
-            'timeout'         => 30,
-            'encryption'      => null,
-            'crypto'          => null,
-            'local_domain'    => null,
-            'encryption'      => null,
-            'reconnect_after' => null,
-            'retry'           => null,
-            'lazy'            => false,
-        ];
-
-        return array_replace($default, $config);
-    }
-
     protected function normalizeRoot(array $config = []): array
     {
         $default = [
-            'default_mailer' => 'default',
-            'mailers' => [
-                'default' => $this->normalizeNodeTransport(),
+            'default_transport' => 'default',
+            'transports' => [
+                'default' => [
+                    'smtp' => $this->normalizeSmtpNode(),
+                ],
             ],
         ];
 
         return array_replace_recursive($default, $config);
+    }
+
+    protected function normalizeSmtpNode(array $config = []): array
+    {
+        static $default = [
+            'lazy'            => false,
+            'host'            => 'localhost',
+            'port'            => null,
+            'username'        => null,
+            'password'        => null,
+            'timeout'         => 30,
+            'reconnect_after' => null,
+            'local_domain'    => null,
+            'auth_mode'       => 'auto',
+            'encryption'      => null,
+            'crypto'          => null,
+        ];
+
+        return array_replace($default, $config);
     }
 }

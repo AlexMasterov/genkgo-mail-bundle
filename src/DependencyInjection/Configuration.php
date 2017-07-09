@@ -24,13 +24,13 @@ class Configuration implements ConfigurationInterface
         $rootNode
             ->validate()
                 ->ifTrue(static function ($value) {
-                    return !isset($value['mailers'][$value['default_mailer']]);
+                    return !isset($value['transports'][$value['default_transport']]);
                 })
-                ->thenInvalid('"default_mailer" not found.')
+                ->thenInvalid('"default_transport" not found.')
             ->end()
             ->children()
-                ->scalarNode('default_mailer')->end()
-                ->append($this->mailersNode())
+                ->scalarNode('default_transport')->end()
+                ->append($this->transportsNode())
             ->end()
         ;
 
@@ -40,12 +40,13 @@ class Configuration implements ConfigurationInterface
     private function normalizeRootNode(ArrayNodeDefinition $rootNode)
     {
         $normalizer = static function ($value) {
-            $defaultMailer = $value['default_mailer'] ?? 'default';
-            unset($value['default_mailer']);
+            $defaultTransport = $value['default_transport'] ?? 'default';
+            unset($value['default_transport']);
 
+            $transports = $value['transports'] ?? [$defaultTransport => $value];
             return [
-                'default_mailer' => $defaultMailer,
-                'mailers' => $value['mailers'] ?? [$defaultMailer => $value],
+                'default_transport' => $defaultTransport,
+                'transports' => $transports,
             ];
         };
 
@@ -55,60 +56,97 @@ class Configuration implements ConfigurationInterface
     /**
      * @return ArrayNodeDefinition
      */
-    private function mailersNode()
+    private function transportsNode(): ArrayNodeDefinition
     {
-        $node = (new TreeBuilder)->root('mailers');
+        $node = new ArrayNodeDefinition('transports');
         $node
+            ->ignoreExtraKeys(false)
             ->useAttributeAsKey('name')
             ->prototype('array')
                 ->children()
-                    ->enumNode('transport')->defaultValue('smtp')
-                        ->treatNullLike('null')
-                        ->values(['smtp', 'sendmail', 'null'])
-                    ->end()
-                    ->scalarNode('host')->defaultValue('localhost')->end()
-                    ->scalarNode('port')->defaultNull()->end()
-                    ->scalarNode('username')->defaultNull()->end()
-                    ->scalarNode('password')->defaultNull()->end()
-                    ->enumNode('auth_mode')->defaultValue('auto')
-                        ->values(['none', 'plain', 'login', 'auto'])
-                    ->end()
-                    ->enumNode('encryption')->defaultNull()
-                        ->values(['tls', 'ssl', null])
-                    ->end()
-                    ->scalarNode('crypto')->defaultNull()
-                        ->beforeNormalization()
-                            ->ifString()
-                            ->then(static function ($v) {
-                                $methods = \preg_split('/\s*,\s*/', $v, -1, \PREG_SPLIT_NO_EMPTY);
+                    ->append($this->smtpNode())
+                    ->append($this->sendmailNode())
+                ->end()
+            ->end()
+        ;
 
-                                static $crypto = null;
-                                static $missingMethods = [];
-                                foreach ($methods as $method) {
-                                    $constant = "STREAM_CRYPTO_METHOD_{$method}";
-                                    if (\defined($constant)) {
-                                        $crypto |= \constant($constant);
-                                    } else {
-                                        $missingMethods[] = $constant;
-                                    }
+        return $node;
+    }
+
+    /**
+     * @return ArrayNodeDefinition
+     */
+    private function smtpNode(): ArrayNodeDefinition
+    {
+        $node = new ArrayNodeDefinition('smtp');
+        $node
+            ->addDefaultsIfNotSet()
+            ->children()
+                ->booleanNode('lazy')->defaultFalse()->end()
+                ->scalarNode('host')->defaultValue('localhost')->end()
+                ->scalarNode('port')->defaultNull()->end()
+                ->scalarNode('username')->defaultNull()->end()
+                ->scalarNode('password')->defaultNull()->end()
+                ->scalarNode('timeout')->defaultValue(30)->end()
+                ->scalarNode('reconnect_after')->defaultNull()->example('PT1S')->end()
+                ->scalarNode('local_domain')->defaultNull()->example('localhost')->end()
+                ->enumNode('auth_mode')->defaultValue('auto')
+                    ->values(['none', 'plain', 'login', 'auto'])
+                ->end()
+                ->enumNode('encryption')->defaultNull()
+                    ->values(['tls', 'ssl', null])
+                ->end()
+                ->scalarNode('crypto')->defaultNull()->example('TLSv1_0_CLIENT, TLSv1_1_CLIENT')
+                    ->beforeNormalization()
+                        ->ifString()
+                        ->then(static function ($v) {
+                            $methods = \preg_split('/\s*,\s*/', $v, -1, \PREG_SPLIT_NO_EMPTY);
+
+                            static $crypto = null;
+                            static $missingMethods = [];
+                            foreach ($methods as $method) {
+                                $constant = "STREAM_CRYPTO_METHOD_{$method}";
+                                if (\defined($constant)) {
+                                    $crypto |= \constant($constant);
+                                } else {
+                                    $missingMethods[] = $constant;
                                 }
+                            }
 
-                                if (empty($missingMethods)) {
-                                    return $crypto;
-                                }
+                            if (empty($missingMethods)) {
+                                return $crypto;
+                            }
 
-                                throw new InvalidConfigurationException(\sprintf(
-                                    'The crypto methods are not supported: "%s".',
-                                    \implode('", "', $missingMethods)
-                                ));
-                            })
-                        ->end()
+                            throw new InvalidConfigurationException(\sprintf(
+                                'The crypto methods are not supported: "%s".',
+                                \implode('", "', $missingMethods)
+                            ));
+                        })
                     ->end()
-                    ->scalarNode('local_domain')->defaultNull()->end()
-                    ->scalarNode('timeout')->defaultValue(30)->end()
-                    ->scalarNode('reconnect_after')->defaultNull()->end()
-                    ->scalarNode('retry')->defaultNull()->end()
-                    ->booleanNode('lazy')->defaultFalse()->end()
+                ->end()
+            ->end()
+        ;
+
+        return $node;
+    }
+
+    /**
+     * @return ArrayNodeDefinition
+     */
+    private function sendmailNode(): ArrayNodeDefinition
+    {
+        $node = new ArrayNodeDefinition('sendmail');
+        $node
+            ->children()
+                ->booleanNode('lazy')->defaultFalse()->end()
+                ->arrayNode('parameters')
+                    ->beforeNormalization()
+                        ->ifString()
+                        ->then(static function ($v) {
+                            return \preg_split('/\s+/', $v, -1, \PREG_SPLIT_NO_EMPTY);
+                        })
+                    ->end()
+                    ->prototype('scalar')->end()
                 ->end()
             ->end()
         ;

@@ -18,31 +18,27 @@ class SmtpClientPass implements CompilerPassInterface
      */
     public function process(ContainerBuilder $container)
     {
-        if (false === $container->hasParameter('genkgo_mail.default_mailer')) {
-            return;
-        }
+        $transports = $container->findTaggedServiceIds('genkgo_mail.smtp_client', false);
 
-        $mailers = $container->findTaggedServiceIds('genkgo_mail.smtp_client', false);
-
-        foreach ($mailers as $mailer => [$options]) {
-            $this->configureClient($mailer, $options, $container);
+        foreach ($transports as $transport => [$options]) {
+            $this->configureClient($transport, $options, $container);
         }
     }
 
     /**
-     * @param string $mailer
+     * @param string $transport
      * @param array $options
      * @param ContainerBuilder $container
      */
-    private function configureClient(string $mailer, array $options, ContainerBuilder $container): void
+    private function configureClient(string $transport, array $options, ContainerBuilder $container): void
     {
-        $factoryId = "{$mailer}.protocol.client_factory";
+        $factoryId = "{$transport}.protocol.client_factory";
         $container->setDefinition($factoryId, $this->factoryDefinition($options));
 
-        $clientId = "{$mailer}.protocol.client";
+        $clientId = "{$transport}.protocol.client";
         $container->setDefinition($clientId, $this->clientDefinition($factoryId));
 
-        $container->getDefinition($mailer)->replaceArgument(0, new Reference($clientId));
+        $container->getDefinition($transport)->replaceArgument(0, new Reference($clientId));
     }
 
     /**
