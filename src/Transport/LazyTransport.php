@@ -42,10 +42,7 @@ class LazyTransport implements TransportInterface
      */
     private function getTransport(): TransportInterface
     {
-        if ($this->decoratedTransport === null) {
-            $this->decoratedTransport = ($this->closure)();
-        }
-
-        return $this->decoratedTransport;
+        return $this->decoratedTransport
+            ?? $this->decoratedTransport = ($this->closure)();
     }
 }

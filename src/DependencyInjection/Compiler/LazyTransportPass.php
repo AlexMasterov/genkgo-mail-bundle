@@ -19,9 +19,16 @@ class LazyTransportPass implements CompilerPassInterface
      */
     public function process(ContainerBuilder $container)
     {
-        $transports = $container->findTaggedServiceIds('genkgo_mail.transport.lazy', false);
+        if (false === $container->getParameter('genkgo_mail.transport')) {
+            return;
+        }
 
-        foreach (\array_keys($transports) as $transport) {
+        $services = $container->findTaggedServiceIds('genkgo_mail.transport.lazy', true);
+        if (empty($services)) {
+            return;
+        }
+
+        foreach (\array_keys($services) as $transport) {
             $this->configureTransport($transport, $container);
         }
     }
@@ -32,11 +39,11 @@ class LazyTransportPass implements CompilerPassInterface
      */
     private function configureTransport(string $transport, ContainerBuilder $container): void
     {
-        $transportId = "{$transport}.transport.lazy";
+        $decoratedId = "{$transport}.transport.lazy";
 
         $definition = (new ChildDefinition('genkgo_mail.transport.lazy.abstract'))
-            ->setDecoratedService($transport, $transportId)
-            ->addArgument(new ServiceClosureArgument(new Reference($transportId)));
+            ->setDecoratedService($transport, $decoratedId)
+            ->addArgument(new ServiceClosureArgument(new Reference($decoratedId)));
 
         $container->setDefinition("{$transport}.lazy", $definition);
     }
