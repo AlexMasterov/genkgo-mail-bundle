@@ -13,8 +13,7 @@
     "mailer",
     "email",
     "symfony",
-    "bundle",
-    "genkgo"
+    "bundle"
   ],
   "config": {
     "sort-packages": true
@@ -36,7 +35,7 @@
     }
   },
   "require": {
-    "php": "7.1 - 7.2",
+    "php": "7.1 - 7.3",
     "genkgo/mail": "^2.0",
     "symfony/config": "3.3 - 4.0",
     "symfony/dependency-injection": "3.3 - 4.0",
