@@ -39,39 +39,4 @@ class ExtensionTest extends TestCase
         self::assertSame($defaultMailer, (string) $container->getAlias('genkgo_mail.transport'));
         self::assertInstanceOf(TransportInterface::class, $container->get($defaultMailer));
     }
-
-    /**
-     * @test
-     */
-    public function it_valid_register_lazy_transport()
-    {
-        $config = [
-            'default_transport' => 'default',
-            'transports' => [
-                'default' => [
-                    'smtp' => [
-                        'lazy' => true,
-                    ],
-                ],
-            ],
-        ];
-
-        $defaultTransport = 'genkgo_mail.transport.' . $config['default_transport'];
-
-        // Execute
-        $container = $this->container($config);
-        $container->compile();
-
-        // Verify
-        self::assertSame("{$defaultTransport}.lazy", (string) $container->getAlias('genkgo_mail.transport'));
-        self::assertInstanceOf(TransportInterface::class, $container->get($defaultTransport));
-
-        $getTransportMethod = function () {
-            return $this->getTransport();
-        };
-
-        $transportFromClosure = $getTransportMethod->call($container->get($defaultTransport));
-
-        self::assertInstanceOf(TransportInterface::class, $transportFromClosure);
-    }
 }
